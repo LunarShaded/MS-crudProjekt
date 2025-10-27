@@ -24,12 +24,12 @@ CREATE TABLE tasks (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Insert sample data
+
 INSERT INTO users (login, password_hash, role) VALUES 
 ('admin', '$2b$10$K9s5f.3RrGJL7WqQ8Q8qE.JJ7Vk5L5V5L5V5L5V5L5V5L5V5L5V5L', 'ADMIN'),
 ('user1', '$2b$10$K9s5f.3RrGJL7WqQ8Q8qE.JJ7Vk5L5V5L5V5L5V5L5V5L5V5L', 'USER');
 
--- Password for both users: "password123"
+
 
 INSERT INTO tasks (title, description, status, user_id) VALUES 
 ('Pierwsze zadanie', 'To jest przykładowe zadanie', 'PENDING', 1),
