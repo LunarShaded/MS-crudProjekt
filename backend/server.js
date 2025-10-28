@@ -5,16 +5,41 @@ import jwt from 'jsonwebtoken';
 import pkg from 'pg';
 import dotenv from 'dotenv';
 
+
 dotenv.config();
+
 
 const { Pool } = pkg;
 const app = express();
 
-app.use(cors());
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:3000',
+    ];
+    
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    if (origin.includes('.onrender.com')) {
+      return callback(null, true);
+    }
+    
+    return callback(new Error('Not allowed by CORS'), false);
+  },
+  credentials: true
+}));
+
 app.use(express.json());
+
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
 // Middleware do weryfikacji tokenu
