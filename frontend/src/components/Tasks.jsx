@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const Tasks = ({ user }) => {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
