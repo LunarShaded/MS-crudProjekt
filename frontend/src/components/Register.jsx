@@ -36,21 +36,16 @@ const Register = ({ onSwitchToLogin }) => {
     }
 
     setLoading(true)
-
     try {
-      const response = await axios.post('http://localhost:5000/register', {
-        login: formData.login,
-        password: formData.password
-      })
-      
-      setSuccess('Konto utworzone pomyślnie! Możesz się teraz zalogować.')
-      setFormData({ login: '', password: '', confirmPassword: '' })
+      await axios.post(`${API_BASE}/register`, formData)
+      setSuccess('Rejestracja zakończona sukcesem. Możesz się zalogować.')
     } catch (error) {
-      setError(error.response?.data?.error || 'Błąd rejestracji')
+      setError(error.response?.data?.error || 'Błąd logowania')
     } finally {
       setLoading(false)
     }
   }
+
 
   return (
     <div className="container">
