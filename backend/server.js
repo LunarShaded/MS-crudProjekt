@@ -51,6 +51,16 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.get('/test-db', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT NOW()');
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('DB error:', err);
+    res.status(500).json({ error: 'Database connection failed', details: err.message });
+  }
+});
+
 // Middleware do weryfikacji tokenu
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
