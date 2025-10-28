@@ -24,7 +24,7 @@ const Login = ({ onLogin, onSwitchToRegister }) => {
     setLoading(true)
 
     try {
-      const response = await axios.post('http://localhost:5000/login', formData)
+      const response = await axios.post(`${API_BASE}/login`, formData)
       onLogin(response.data.user, response.data.token)
     } catch (error) {
       setError(error.response?.data?.error || 'Błąd logowania')

@@ -21,7 +21,7 @@ const Tasks = ({ user }) => {
 
   const loadTasks = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/tasks')
+    const response = await axios.get(`${API_BASE}/tasks`);
       setTasks(response.data)
     } catch (error) {
       if (error.response?.status === 401) {
@@ -47,9 +47,9 @@ const Tasks = ({ user }) => {
     
     try {
       if (editingTask) {
-        await axios.put(`http://localhost:5000/tasks/${editingTask.id}`, formData)
+        const response = await axios.post(`${API_BASE}/tasks`, formData);
       } else {
-        await axios.post('http://localhost:5000/tasks', formData)
+        await axios.post(`${API_BASE}/tasks`, formData)
       }
       
       setFormData({ title: '', description: '', status: 'PENDING' })
@@ -78,7 +78,7 @@ const Tasks = ({ user }) => {
   const handleDelete = async (taskId) => {
     if (window.confirm('Czy na pewno chcesz usunąć to zadanie?')) {
       try {
-        await axios.delete(`http://localhost:5000/tasks/${taskId}`)
+        await axios.delete(`${API_BASE}/tasks/${taskId}`)
         loadTasks()
       } catch (error) {
         if (error.response?.status === 401) {

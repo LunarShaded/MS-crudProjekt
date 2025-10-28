@@ -7,7 +7,8 @@ const Home = () => {
   const [appInfo, setAppInfo] = useState(null)
 
   useEffect(() => {
-    axios.get('http://localhost:5000/')
+   
+    axios.get(`${API_BASE}/`)
       .then(response => {
         setAppInfo(response.data)
       })
