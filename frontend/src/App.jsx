@@ -10,16 +10,24 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 function App() {
   const [currentView, setCurrentView] = useState('home')
   const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-      // W prawdziwej aplikacji warto zweryfikować token przez API
       const userData = localStorage.getItem('user')
-      if (userData) {
-        setUser(JSON.parse(userData))
+
+      try {
+   
+        if (userData && userData !== 'undefined' && userData !== 'null') {
+          const parsed = JSON.parse(userData)
+          setUser(parsed)
+        } else {
+          localStorage.removeItem('user') 
+        }
+      } catch (err) {
+        console.error('Błąd przy odczycie danych użytkownika:', err)
+        localStorage.removeItem('user')
       }
     }
   }, [])

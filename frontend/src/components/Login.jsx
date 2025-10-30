@@ -25,9 +25,18 @@ const Login = ({ onLogin, onSwitchToRegister }) => {
 
     try {
       const response = await axios.post(`${API_BASE}/login`, formData)
-      onLogin(response.data.user, response.data.token)
-    } catch (error) {
-      setError(error.response?.data?.error || 'Błąd logowania')
+      const { user, token } = response.data
+      if (user && token) {
+        localStorage.setItem('token', token)
+        localStorage.setItem('user', JSON.stringify(user))
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+        onLogin(user, token)
+      } else {
+        setError('Nieprawidłowa odpowiedź serwera')
+      }
+    } catch (err) {
+      console.error(err)
+      setError(err.response?.data?.error || 'Błąd logowania')
     } finally {
       setLoading(false)
     }
