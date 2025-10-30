@@ -47,7 +47,7 @@ const Tasks = ({ user }) => {
     
     try {
       if (editingTask) {
-        const response = await axios.post(`${API_BASE}/tasks`, formData);
+        await axios.put(`${API_BASE}/tasks/${editingTask.id}`, formData)
       } else {
         await axios.post(`${API_BASE}/tasks`, formData)
       }
