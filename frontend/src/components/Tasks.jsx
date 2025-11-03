@@ -14,6 +14,7 @@ const Tasks = ({ user }) => {
     description: '',
     status: 'PENDING'
   })
+  const [formErrors, setFormErrors] = useState({})
 
   useEffect(() => {
     loadTasks()
@@ -21,11 +22,14 @@ const Tasks = ({ user }) => {
 
   const loadTasks = async () => {
     try {
-    const response = await axios.get(`${API_BASE}/tasks`);
+      const response = await axios.get(`${API_BASE}/tasks`)
       setTasks(response.data)
     } catch (error) {
+      console.error('Błąd ładowania zadań:', error)
       if (error.response?.status === 401) {
         setError('Brak autoryzacji. Zaloguj się ponownie.')
+      } else if (error.response?.status === 403) {
+        setError('Brak uprawnień do przeglądania zadań.')
       } else {
         setError('Błąd podczas ładowania zadań')
       }
@@ -34,17 +38,57 @@ const Tasks = ({ user }) => {
     }
   }
 
+ 
+  const validateTaskForm = () => {
+    const newErrors = {}
+
+ 
+    if (!formData.title.trim()) {
+      newErrors.title = 'Tytuł jest wymagany'
+    } else if (formData.title.length > 255) {
+      newErrors.title = 'Tytuł może mieć maksymalnie 255 znaków'
+    }
+
+
+    if (formData.description && formData.description.length > 1000) {
+      newErrors.description = 'Opis może mieć maksymalnie 1000 znaków'
+    }
+
+    
+    if (!['PENDING', 'IN_PROGRESS', 'COMPLETED'].includes(formData.status)) {
+      newErrors.status = 'Nieprawidłowy status zadania'
+    }
+
+    setFormErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    })
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
+    
+   
+    if (formErrors[name]) {
+      setFormErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }))
+    }
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    setFormErrors({})
     
+
+    if (!validateTaskForm()) {
+      return
+    }
+
     try {
       if (editingTask) {
         await axios.put(`${API_BASE}/tasks/${editingTask.id}`, formData)
@@ -55,10 +99,25 @@ const Tasks = ({ user }) => {
       setFormData({ title: '', description: '', status: 'PENDING' })
       setShowForm(false)
       setEditingTask(null)
+      setFormErrors({})
       loadTasks()
     } catch (error) {
+      console.error('Błąd zapisywania zadania:', error)
+      
       if (error.response?.status === 401) {
         setError('Sesja wygasła. Zaloguj się ponownie.')
+      } else if (error.response?.status === 403) {
+        setError('Brak uprawnień do modyfikacji zadań.')
+      } else if (error.response?.status === 404) {
+        setError('Zadanie nie zostało znalezione.')
+      } else if (error.response?.data?.fieldErrors) {
+        const backendErrors = {}
+        error.response.data.fieldErrors.forEach(fieldError => {
+          backendErrors[fieldError.field] = fieldError.message
+        })
+        setFormErrors(backendErrors)
+      } else if (error.response?.data?.message) {
+        setError(error.response.data.message)
       } else {
         setError('Błąd podczas zapisywania zadania')
       }
@@ -73,6 +132,7 @@ const Tasks = ({ user }) => {
       status: task.status
     })
     setShowForm(true)
+    setFormErrors({})
   }
 
   const handleDelete = async (taskId) => {
@@ -81,8 +141,13 @@ const Tasks = ({ user }) => {
         await axios.delete(`${API_BASE}/tasks/${taskId}`)
         loadTasks()
       } catch (error) {
+        console.error('Błąd usuwania zadania:', error)
         if (error.response?.status === 401) {
           setError('Brak autoryzacji. Zaloguj się ponownie.')
+        } else if (error.response?.status === 403) {
+          setError('Brak uprawnień do usunięcia zadania.')
+        } else if (error.response?.status === 404) {
+          setError('Zadanie nie zostało znalezione.')
         } else {
           setError('Błąd podczas usuwania zadania')
         }
@@ -94,11 +159,13 @@ const Tasks = ({ user }) => {
     setShowForm(false)
     setEditingTask(null)
     setFormData({ title: '', description: '', status: 'PENDING' })
+    setFormErrors({})
   }
 
   const getStatusText = (status) => {
     switch (status) {
       case 'PENDING': return 'Oczekujące'
+      case 'IN_PROGRESS': return 'W trakcie'
       case 'COMPLETED': return 'Zakończone'
       default: return status
     }
@@ -107,6 +174,7 @@ const Tasks = ({ user }) => {
   const getStatusClass = (status) => {
     switch (status) {
       case 'PENDING': return 'status-pending'
+      case 'IN_PROGRESS': return 'status-in-progress'
       case 'COMPLETED': return 'status-completed'
       default: return ''
     }
@@ -147,18 +215,22 @@ const Tasks = ({ user }) => {
             <h3 style={{ color: '#4cc9f0', marginBottom: '1.5rem' }}>
               {editingTask ? 'Edytuj Zadanie' : 'Nowe Zadanie'}
             </h3>
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} noValidate>
               <div className="form-group">
-                <label className="form-label">Tytuł:</label>
+                <label className="form-label">Tytuł *:</label>
                 <input
                   type="text"
                   name="title"
                   value={formData.title}
                   onChange={handleChange}
-                  className="form-input"
+                  className={`form-input ${formErrors.title ? 'input-error' : ''}`}
                   placeholder="Wpisz tytuł zadania"
                   required
+                  maxLength="255"
                 />
+                {formErrors.title && (
+                  <div className="error-message">{formErrors.title}</div>
+                )}
               </div>
 
               <div className="form-group">
@@ -167,10 +239,17 @@ const Tasks = ({ user }) => {
                   name="description"
                   value={formData.description}
                   onChange={handleChange}
-                  className="form-input"
+                  className={`form-input ${formErrors.description ? 'input-error' : ''}`}
                   rows="3"
                   placeholder="Opis zadania (opcjonalnie)"
+                  maxLength="1000"
                 />
+                {formErrors.description && (
+                  <div className="error-message">{formErrors.description}</div>
+                )}
+                <div style={{ fontSize: '0.8rem', color: '#888', textAlign: 'right' }}>
+                  {formData.description.length}/1000
+                </div>
               </div>
 
               <div className="form-group">
@@ -179,11 +258,15 @@ const Tasks = ({ user }) => {
                   name="status"
                   value={formData.status}
                   onChange={handleChange}
-                  className="form-input"
+                  className={`form-input ${formErrors.status ? 'input-error' : ''}`}
                 >
                   <option value="PENDING">Oczekujące</option>
+                  <option value="IN_PROGRESS">W trakcie</option>
                   <option value="COMPLETED">Zakończone</option>
                 </select>
+                {formErrors.status && (
+                  <div className="error-message">{formErrors.status}</div>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: '1rem' }}>

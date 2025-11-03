@@ -8,19 +8,60 @@ const Login = ({ onLogin, onSwitchToRegister }) => {
     login: '',
     password: ''
   })
-  const [error, setError] = useState('')
+  const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
 
+
+  const validateForm = () => {
+    const newErrors = {}
+
+    
+    if (!formData.login.trim()) {
+      newErrors.login = 'Login jest wymagany'
+    } else if (formData.login.length < 3) {
+      newErrors.login = 'Login musi mieć co najmniej 3 znaki'
+    } else if (formData.login.length > 50) {
+      newErrors.login = 'Login może mieć maksymalnie 50 znaków'
+    } else if (!/^[a-zA-Z0-9_]+$/.test(formData.login)) {
+      newErrors.login = 'Login może zawierać tylko litery, cyfry i podkreślniki'
+    }
+
+
+    if (!formData.password) {
+      newErrors.password = 'Hasło jest wymagane'
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Hasło musi mieć co najmniej 6 znaków'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    })
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
+    
+    
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }))
+    }
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setError('')
+    
+  
+    if (!validateForm()) {
+      return
+    }
+
+    setErrors({})
     setLoading(true)
 
     try {
@@ -32,11 +73,23 @@ const Login = ({ onLogin, onSwitchToRegister }) => {
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
         onLogin(user, token)
       } else {
-        setError('Nieprawidłowa odpowiedź serwera')
+        setErrors({ general: 'Nieprawidłowa odpowiedź serwera' })
       }
     } catch (err) {
-      console.error(err)
-      setError(err.response?.data?.error || 'Błąd logowania')
+      console.error('Błąd logowania:', err)
+      
+      
+      if (err.response?.data?.fieldErrors) {
+        const backendErrors = {}
+        err.response.data.fieldErrors.forEach(error => {
+          backendErrors[error.field] = error.message
+        })
+        setErrors(backendErrors)
+      } else if (err.response?.data?.message) {
+        setErrors({ general: err.response.data.message })
+      } else {
+        setErrors({ general: err.response?.data?.error || 'Błąd logowania' })
+      }
     } finally {
       setLoading(false)
     }
@@ -49,13 +102,13 @@ const Login = ({ onLogin, onSwitchToRegister }) => {
           Logowanie
         </h2>
         
-        {error && (
+        {errors.general && (
           <div className="alert alert-error">
-            {error}
+            {errors.general}
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <div className="form-group">
             <label className="form-label">Login:</label>
             <input
@@ -63,9 +116,16 @@ const Login = ({ onLogin, onSwitchToRegister }) => {
               name="login"
               value={formData.login}
               onChange={handleChange}
-              className="form-input"
+              className={`form-input ${errors.login ? 'input-error' : ''}`}
               required
+              minLength="3"
+              maxLength="50"
+              pattern="[a-zA-Z0-9_]+"
+              title="Login może zawierać tylko litery, cyfry i podkreślniki"
             />
+            {errors.login && (
+              <div className="error-message">{errors.login}</div>
+            )}
           </div>
 
           <div className="form-group">
@@ -75,9 +135,13 @@ const Login = ({ onLogin, onSwitchToRegister }) => {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              className="form-input"
+              className={`form-input ${errors.password ? 'input-error' : ''}`}
               required
+              minLength="6"
             />
+            {errors.password && (
+              <div className="error-message">{errors.password}</div>
+            )}
           </div>
 
           <button 

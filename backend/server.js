@@ -4,7 +4,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import pkg from 'pg';
 import dotenv from 'dotenv';
-
+import { validateAuth, validateTask, handleValidationErrors } from './validation.js';
 
 dotenv.config();
 
@@ -58,7 +58,12 @@ app.get('/test-db', async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('DB error:', err);
-    res.status(500).json({ error: 'Database connection failed', details: err.message });
+    res.status(500).json({ 
+      timestamp: new Date().toISOString(),
+      status: 500,
+      error: 'Internal Server Error',
+      message: 'Database connection failed'
+    });
   }
 });
 
@@ -68,12 +73,22 @@ const authenticateToken = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({ error: 'Token dostępu wymagany' });
+    return  res.status(401).json({ 
+      timestamp: new Date().toISOString(),
+      status: 401,
+      error: 'Unauthorized',
+      message: 'Token dostępu wymagany'
+    });
   }
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) {
-      return res.status(403).json({ error: 'Nieprawidłowy token' });
+      return res.status(403).json({ 
+        timestamp: new Date().toISOString(),
+        status: 403,
+        error: 'Forbidden',
+        message: 'Nieprawidłowy token'
+      });
     }
     req.user = user;
     next();
@@ -90,7 +105,7 @@ app.get('/', (req, res) => {
 });
 
 // Rejestracja
-app.post('/register', async (req, res) => {
+app.post('/register', validateAuth, handleValidationErrors, async (req, res) => {
   try {
     const { login, password } = req.body;
 
@@ -109,7 +124,12 @@ app.post('/register', async (req, res) => {
     );
 
     if (existingUser.rows.length > 0) {
-      return res.status(400).json({ error: 'Login jest już zajęty' });
+      return res.status(409).json({
+        timestamp: new Date().toISOString(),
+        status: 409,
+        error: 'Conflict',
+        message: 'Login jest już zajęty'
+      });
     }
 
     // Hash hasła
@@ -128,12 +148,17 @@ app.post('/register', async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Błąd serwera' });
+    res.status(500).json({
+      timestamp: new Date().toISOString(),
+      status: 500,
+      error: 'Internal Server Error',
+      message: 'Błąd serwera'
+    });
   }
 });
 
 // Logowanie
-app.post('/login', async (req, res) => {
+app.post('/login', validateAuth, handleValidationErrors, async(req, res) => {
   try {
     const { login, password } = req.body;
 
@@ -148,7 +173,12 @@ app.post('/login', async (req, res) => {
     );
 
     if (userResult.rows.length === 0) {
-      return res.status(401).json({ error: 'Nieprawidłowy login lub hasło' });
+      return res.status(401).json({
+        timestamp: new Date().toISOString(),
+        status: 401,
+        error: 'Unauthorized',
+        message: 'Nieprawidłowy login lub hasło'
+      });
     }
 
     const user = userResult.rows[0];
@@ -156,7 +186,12 @@ app.post('/login', async (req, res) => {
     // Sprawdź hasło
     const validPassword = await bcrypt.compare(password, user.password_hash);
     if (!validPassword) {
-      return res.status(401).json({ error: 'Nieprawidłowy login lub hasło' });
+      return res.status(401).json({
+        timestamp: new Date().toISOString(),
+        status: 401,
+        error: 'Unauthorized',
+        message: 'Nieprawidłowy login lub hasło'
+      });
     }
 
     // Generuj token JWT
@@ -181,7 +216,12 @@ app.post('/login', async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Błąd serwera' });
+    res.status(500).json({
+      timestamp: new Date().toISOString(),
+      status: 500,
+      error: 'Internal Server Error',
+      message: 'Błąd serwera'
+    });
   }
 });
 
@@ -197,12 +237,17 @@ app.get('/tasks', authenticateToken, async (req, res) => {
     res.json(tasks.rows);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Błąd serwera' });
+    res.status(500).json({
+      timestamp: new Date().toISOString(),
+      status: 500,
+      error: 'Internal Server Error',
+      message: 'Błąd serwera'
+    });
   }
 });
 
 // Utwórz nowe zadanie
-app.post('/tasks', authenticateToken, async (req, res) => {
+app.post('/tasks', authenticateToken, validateTask, handleValidationErrors, async (req, res) => {
   try {
     const { title, description, status } = req.body;
 
@@ -218,12 +263,17 @@ app.post('/tasks', authenticateToken, async (req, res) => {
     res.status(201).json(newTask.rows[0]);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Błąd serwera' });
+    res.status(500).json({
+      timestamp: new Date().toISOString(),
+      status: 500,
+      error: 'Internal Server Error',
+      message: 'Błąd serwera'
+    });
   }
 });
 
 // Aktualizuj zadanie
-app.put('/tasks/:id', authenticateToken, async (req, res) => {
+app.put('/tasks/:id', authenticateToken, validateTask, handleValidationErrors, async (req, res) => {
   try {
     const { id } = req.params;
     const { title, description, status } = req.body;
@@ -234,7 +284,12 @@ app.put('/tasks/:id', authenticateToken, async (req, res) => {
     );
 
     if (task.rows.length === 0) {
-      return res.status(404).json({ error: 'Zadanie nie znalezione' });
+      return res.status(404).json({
+        timestamp: new Date().toISOString(),
+        status: 404,
+        error: 'Not Found',
+        message: 'Zadanie nie znalezione'
+      });
     }
 
     const updatedTask = await pool.query(
@@ -245,7 +300,12 @@ app.put('/tasks/:id', authenticateToken, async (req, res) => {
     res.json(updatedTask.rows[0]);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Błąd serwera' });
+    res.status(500).json({
+      timestamp: new Date().toISOString(),
+      status: 500,
+      error: 'Internal Server Error',
+      message: 'Błąd serwera'
+    });
   }
 });
 
@@ -260,7 +320,12 @@ app.delete('/tasks/:id', authenticateToken, async (req, res) => {
     );
 
     if (task.rows.length === 0) {
-      return res.status(404).json({ error: 'Zadanie nie znalezione' });
+      return res.status(404).json({
+        timestamp: new Date().toISOString(),
+        status: 404,
+        error: 'Not Found',
+        message: 'Zadanie nie znalezione'
+      });
     }
 
     await pool.query(
@@ -271,11 +336,20 @@ app.delete('/tasks/:id', authenticateToken, async (req, res) => {
     res.json({ message: 'Zadanie usunięte pomyślnie' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Błąd serwera' });
+    res.status(500).json({
+      timestamp: new Date().toISOString(),
+      status: 500,
+      error: 'Internal Server Error',
+      message: 'Błąd serwera'
+    });
   }
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Serwer działa na porcie ${PORT}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`Serwer działa na porcie ${PORT}`);
+  });
+}
+
+export default app;
