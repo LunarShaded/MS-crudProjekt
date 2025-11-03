@@ -1,0 +1,119 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: |
+        npm install
+        cd frontend && npm install && cd ..
+    
+    - name: Run backend tests
+      run: npm test
+      env:
+        NODE_ENV: test
+        JWT_SECRET: test-secret
+        DATABASE_URL: postgresql://test:test@localhost:5432/test
+    
+    - name: Run frontend tests
+      run: |
+        cd frontend
+        npm run test -- --watchAll=false
+        cd ..
+    
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm run build
+        cd ..
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-build
+        path: frontend/dist/
+        retention-days: 1
+
+  deploy-prod:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: frontend-build
+        path: frontend/dist
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Deploy to Render
+      run: |
+        curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
+      if: success()
+    
+    - name: Smoke test
+      run: |
+        echo "Waiting for deployment to complete..."
+        sleep 60
+        curl -f ${{ secrets.PRODUCTION_URL }}/health || exit 1
+        
+    - name: Update README with production URL
+      run: |
+        PRODUCTION_URL="${{ secrets.PRODUCTION_URL }}"
+        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        
+        # Create or update README with deployment info
+        cat > DEPLOYMENT.md << EOF
+        # Production Deployment
+        
+        **Last deployed:** $TIMESTAMP
+        **Production URL:** $PRODUCTION_URL
+        **Status:** ✅ Operational
+        
+        ## Health Check
+        \`\`\`bash
+        curl $PRODUCTION_URL/health
+        \`\`\`
+        
+        ## API Endpoints
+        - \`GET /\` - API info
+        - \`POST /register\` - User registration
+        - \`POST /login\` - User login
+        - \`GET /tasks\` - Get user tasks (protected)
+        - \`POST /tasks\` - Create task (protected)
+        EOF
+      
+      if: success()
